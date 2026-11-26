@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "shienze.bar-peek",
+  "name": "Bar Peek",
+  "version": "1.0.0",
+  "author": "shienze",
+  "description": "Reveal the Omarchy bar over the windows from any screen edge, without moving a window.",
+  "license": "MIT",
+  "kinds": ["bar"],
+  "entryPoints": { "bar": "Bar.qml" },
+  "omarchy": { "clonedFrom": "omarchy.bar" }
+}
