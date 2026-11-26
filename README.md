@@ -50,6 +50,11 @@ Tested on Omarchy `4.0.0.r8379` (omarchy-dev) with Hyprland `0.57.2`, on a
 - A `2 px` overlay strip along the bar's own edge catches the pointer. A second
   hover observer on the bar's content item holds it open while you use it, and
   keeps it open for an open popout or a widget mid-drag.
+- **Over a fullscreen window** the host bar deliberately drops its input region
+  to nothing, so clicks reach the fullscreen app. That would leave a revealed
+  bar visible but dead, so Bar Peek takes the bar strip back as its input region
+  for as long as the bar is out, and hands the stock region back when it slides
+  away.
 - It reaches the host's per-screen panel windows by scanning the inherited item
   tree for the bar's `Variants`. That is host-internal, so it is guarded: if the
   windows cannot be found within ~5 s, the plugin refuses to park anything and
@@ -81,10 +86,16 @@ omarchy plugin clone shienze.bar-peek      # -> ~/.config/omarchy/plugins/<you>.
 ## Verify
 
 ```bash
-./check.sh                              # windows not moved, strip on the right edge
-omarchy-shell bar-peek status           # JSON: position, hidden, per-screen reveal state
+./check.sh                               # windows not moved, trigger strip on the bar's edge
+omarchy-shell bar-peek status            # JSON: position, hidden, per-screen reveal state
+omarchy-shell bar-peek reveal            # slide the bar out and hold it (no pointer needed)
+omarchy-shell bar-peek hide              # let it go again
 hyprctl monitors -j | jq '.[0].reserved' # [0,0,0,0] whenever Bar Peek is active
 ```
+
+`status` reports, per screen, `revealed`, `held`, `offset`, the host
+`exclusion` mode, and `input` — `bar` while the bar's own strip owns the pointer,
+`host` while the stock region is back.
 
 `check.sh` asserts the two promises: no monitor reserves space, and the trigger
 strip sits on the bar's own edge with the right thickness. Hover itself cannot be

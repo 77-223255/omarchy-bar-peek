@@ -107,6 +107,24 @@ Native.Bar {
 
   IpcHandler {
     target: "bar-peek"
+
+    // Reveal and hide without touching the pointer, for testing and scripts.
+    function reveal(): string {
+      for (const screenPeek of peek.instances) {
+        screenPeek.forced = true
+        screenPeek.revealed = true
+      }
+      return "revealed"
+    }
+
+    function hide(): string {
+      for (const screenPeek of peek.instances) {
+        screenPeek.forced = false
+        screenPeek.revealed = false
+      }
+      return "hidden"
+    }
+
     function status(): string {
       return JSON.stringify({
         position: root.position, hidden: root.barHidden,
@@ -115,6 +133,7 @@ Native.Bar {
           name: peeked.window && peeked.window.screen ? peeked.window.screen.name : "",
           revealed: peeked.revealed, held: peeked.held, offset: peeked.offset,
           exclusion: peeked.window ? peeked.window.exclusionMode : -1,
+          input: peeked.wantsInput ? "bar" : "host",
           hover: peeked.hoverState
         }))
       })
@@ -139,8 +158,10 @@ Native.Bar {
         property bool ready: false
         Component.onCompleted: Qt.callLater(() => ready = true)
 
-        // The bar is parked until the pointer asks for it.
+        // The bar is parked until the pointer asks for it, or `bar-peek reveal`.
         property bool revealed: false
+        // Reveal asked for over IPC, held open until `bar-peek hide`.
+        property bool forced: false
 
         // What the regression check reads. `bar` is the native hover state, the
         // other two belong to the trigger strip.
@@ -153,7 +174,7 @@ Native.Bar {
         // Hold the bar open while it is being used: pointer on the bar, pointer
         // still on the trigger strip, an open popout, or a widget being dragged
         // around the bar.
-        readonly property bool held: barHover.hovered
+        readonly property bool held: forced || barHover.hovered
           || (strip.catching && edgeHover.hovered)
           || (root.activePopout !== null && root.targetBelongsToWindow(root.activePopout, window))
           || root.barDragWindow === window
@@ -161,13 +182,28 @@ Native.Bar {
 
         property real offset: root.barHidden && !revealed ? -root.barSize : 0
 
+        // The bar's own thickness along its edge, notch floors included.
+        readonly property int barThickness: {
+          const screen = window.screen
+          if (typeof root.thicknessFor === "function" && screen)
+            return root.thicknessFor(screen)
+          return root.barSize
+        }
+
+        // The host bar drops its input region to nothing whenever a fullscreen
+        // window is on the screen, so clicks reach that window. A revealed bar
+        // would then be visible but dead, since the trigger strip is live and
+        // the bar is not. Take the bar strip back while the pointer is using the
+        // bar; the stock region returns as soon as the bar slides away.
+        readonly property bool wantsInput: revealed && window.dragActive !== true
+
         Behavior on offset {
           NumberAnimation { duration: root.slideMs; easing.type: Easing.OutCubic }
         }
 
         Connections {
           target: root
-          function onBarHiddenChanged() { screenPeek.revealed = false }
+          function onBarHiddenChanged() { screenPeek.revealed = false; screenPeek.forced = false }
           function onPositionChanged() { screenPeek.revealed = false }
         }
 
@@ -195,6 +231,24 @@ Native.Bar {
           property: "layer"
           value: WlrLayer.Overlay
           when: screenPeek.ready && root.barHidden && root.aboveFullscreen
+          restoreMode: Binding.RestoreBindingOrValue
+        }
+
+        // Input region while the bar is out: the strip along its edge, in the
+        // window's own coordinates, whichever edge that is.
+        Region {
+          id: barInput
+          x: root.position === "right" ? Math.round(screenPeek.window.width) - screenPeek.barThickness : 0
+          y: root.position === "bottom" ? Math.round(screenPeek.window.height) - screenPeek.barThickness : 0
+          width: root.verticalEdge ? screenPeek.barThickness : Math.round(screenPeek.window.width)
+          height: root.verticalEdge ? Math.round(screenPeek.window.height) : screenPeek.barThickness
+        }
+
+        Binding {
+          target: screenPeek.window
+          property: "mask"
+          value: barInput
+          when: screenPeek.ready && screenPeek.wantsInput
           restoreMode: Binding.RestoreBindingOrValue
         }
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "shienze.bar-peek",
   "name": "Bar Peek",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "shienze",
   "description": "Reveal the Omarchy bar over the windows from any screen edge, without moving a window.",
   "license": "MIT",
